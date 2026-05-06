@@ -7,6 +7,8 @@ use App\Models\Delivery;
 use App\Services\DeliveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class DriverController extends Controller
 {
@@ -45,7 +47,7 @@ class DriverController extends Controller
         if ($request->filled('signature') && str_starts_with($request->signature, 'data:image')) {
             $img = base64_decode(explode(',', $request->signature)[1] ?? '');
             $sigPath = 'signatures/'.uniqid('sig_').'.png';
-            \Storage::disk('public')->put($sigPath, $img);
+            Storage::disk('public')->put($sigPath, $img);
         }
 
         $this->service->completeDelivery($delivery, [
@@ -74,7 +76,7 @@ class DriverController extends Controller
         ]);
 
         // Optionally cache or broadcast — kept simple
-        \Cache::put("driver_loc_{$request->user()->id}", [
+        Cache::put("driver_loc_{$request->user()->id}", [
             'lat' => $request->lat,
             'lng' => $request->lng,
             'at'  => now()->toIso8601String(),

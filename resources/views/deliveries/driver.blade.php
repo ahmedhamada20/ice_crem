@@ -144,7 +144,7 @@ $('.btn-start').on('click', function () {
 });
 
 function doStart(id, lat, lng, $btn) {
-    $.post("{{ url('api/driver/deliveries') }}/" + id + "/start", { _token: "{{ csrf_token() }}", lat, lng })
+    $.post("{{ url('driver-app/deliveries') }}/" + id + "/start", { _token: "{{ csrf_token() }}", lat, lng })
         .done(() => { toastr.success('تم بدء التوصيل'); setTimeout(() => location.reload(), 600); })
         .fail(() => { toastr.error('خطأ في بدء التوصيل'); $btn.prop('disabled', false).html('<i class="bi bi-play-fill"></i> ابدأ التوصيل'); });
 }
@@ -173,7 +173,7 @@ $('#btnSubmitComplete').on('click', function () {
     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
 
     const submit = (lat, lng) => {
-        $.post("{{ url('api/driver/deliveries') }}/" + id + "/complete", {
+        $.post("{{ url('driver-app/deliveries') }}/" + id + "/complete", {
             _token: "{{ csrf_token() }}", lat, lng, signature: sig, notes: $('#completeNotes').val()
         })
         .done(() => { toastr.success('تم التسليم بنجاح'); $('#completeModal').modal('hide'); setTimeout(() => location.reload(), 700); })
@@ -208,7 +208,7 @@ $('.btn-fail').on('click', function () {
         inputValidator: v => !v && 'لازم تختار سبب'
     }).then(r => {
         if (!r.isConfirmed) return;
-        $.post("{{ url('api/driver/deliveries') }}/" + id + "/fail", { _token: "{{ csrf_token() }}", reason: r.value })
+        $.post("{{ url('driver-app/deliveries') }}/" + id + "/fail", { _token: "{{ csrf_token() }}", reason: r.value })
             .done(() => { toastr.success('تم تسجيل فشل التسليم'); setTimeout(() => location.reload(), 600); })
             .fail(() => toastr.error('خطأ'));
     });
@@ -222,7 +222,7 @@ $('#navHistory').on('click', e => { e.preventDefault(); toastr.info('السجل 
 if (navigator.geolocation) {
     setInterval(() => {
         navigator.geolocation.getCurrentPosition(pos => {
-            $.post("{{ url('api/driver/location') }}", {
+            $.post("{{ url('driver-app/location') }}", {
                 _token: "{{ csrf_token() }}",
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude

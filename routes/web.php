@@ -50,6 +50,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('deliveries/map', [DeliveryController::class, 'map'])->name('deliveries.map');
     Route::resource('deliveries', DeliveryController::class)->only(['index', 'show']);
 
+    // Driver actions (web session — used by the in-browser driver app)
+    Route::prefix('driver-app')->name('driver.')->group(function () {
+        Route::post('deliveries/{delivery}/start',    [\App\Http\Controllers\Api\DriverController::class, 'start'])->name('start');
+        Route::post('deliveries/{delivery}/complete', [\App\Http\Controllers\Api\DriverController::class, 'complete'])->name('complete');
+        Route::post('deliveries/{delivery}/fail',     [\App\Http\Controllers\Api\DriverController::class, 'fail'])->name('fail');
+        Route::post('location',                       [\App\Http\Controllers\Api\DriverController::class, 'updateLocation'])->name('location');
+    });
+
     // Stock + Warehouses + Products
     Route::get('stock/data', [StockController::class, 'getData'])->name('stock.data');
     Route::get('stock/inventory', [StockController::class, 'inventory'])->name('stock.inventory');
