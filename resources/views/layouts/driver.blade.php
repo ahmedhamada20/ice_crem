@@ -209,7 +209,7 @@
             <i class="bi bi-map"></i>
             <span>الخريطة</span>
         </a>
-        <a href="#" id="navHistory">
+        <a href="{{ route('deliveries.driver.history') }}" class="{{ request()->routeIs('deliveries.driver.history') ? 'active' : '' }}">
             <i class="bi bi-clock-history"></i>
             <span>السجل</span>
         </a>

@@ -47,6 +47,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('deliveries/dispatch', [DeliveryController::class, 'dispatchView'])->name('deliveries.dispatch');
     Route::post('deliveries/assign', [DeliveryController::class, 'assign'])->name('deliveries.assign');
     Route::get('deliveries/driver', [DeliveryController::class, 'driverDashboard'])->name('deliveries.driver');
+    Route::get('deliveries/driver/history', [DeliveryController::class, 'driverHistory'])->name('deliveries.driver.history');
     Route::get('deliveries/map', [DeliveryController::class, 'map'])->name('deliveries.map');
     Route::resource('deliveries', DeliveryController::class)->only(['index', 'show']);
 

@@ -82,6 +82,45 @@ class DeliveryController extends Controller
         return view('deliveries.driver', compact('deliveries'));
     }
 
+    public function driverHistory(Request $request)
+    {
+        abort_unless(AuthHelper::isDriver() || AuthHelper::isAdmin(), 403);
+
+        $period = $request->input('period', 'week');  // today | week | month | all
+
+        $base = Delivery::with('order.customer')
+            ->forDriver(auth()->id())
+            ->whereIn('status', ['delivered', 'failed', 'returned']);
+
+        $now = now();
+        match ($period) {
+            'today' => $base->whereDate('updated_at', $now->toDateString()),
+            'week'  => $base->where('updated_at', '>=', $now->copy()->startOfWeek()),
+            'month' => $base->where('updated_at', '>=', $now->copy()->startOfMonth()),
+            default => null,  // 'all' — no filter
+        };
+
+        $deliveries = (clone $base)->orderByDesc('updated_at')->limit(100)->get();
+
+        // Stats (over chosen period)
+        $statsQuery   = clone $base;
+        $deliveredCnt = (clone $statsQuery)->where('status', 'delivered')->count();
+        $failedCnt    = (clone $statsQuery)->where('status', 'failed')->count();
+        $totalRevenue = (float) (clone $statsQuery)->where('status', 'delivered')
+            ->join('orders', 'orders.id', '=', 'deliveries.order_id')
+            ->sum('orders.net_total');
+
+        $stats = [
+            'period'    => $period,
+            'delivered' => $deliveredCnt,
+            'failed'    => $failedCnt,
+            'revenue'   => $totalRevenue,
+            'total'     => $deliveredCnt + $failedCnt,
+        ];
+
+        return view('deliveries.driver-history', compact('deliveries', 'stats', 'period'));
+    }
+
     public function map()
     {
         $isDriverOnly = AuthHelper::isDriver() && ! AuthHelper::isAdmin();

@@ -214,9 +214,6 @@ $('.btn-fail').on('click', function () {
     });
 });
 
-// ── Bottom-nav: history (placeholder) ──────────────
-$('#navHistory').on('click', e => { e.preventDefault(); toastr.info('السجل قريباً'); });
-
 // ── Periodic location ping (optional) ──────────────
 @if($inProgress > 0)
 if (navigator.geolocation) {
