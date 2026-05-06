@@ -28,6 +28,9 @@ class DriverController extends Controller
     public function start(Delivery $delivery, Request $request): JsonResponse
     {
         abort_unless($delivery->driver_id === $request->user()->id, 403);
+
+        if ($error = $this->guardFutureDelivery($delivery)) return $error;
+
         $this->service->startDelivery($delivery, $request->lat, $request->lng);
         return response()->json(['success' => true]);
     }
@@ -35,6 +38,8 @@ class DriverController extends Controller
     public function complete(Delivery $delivery, Request $request): JsonResponse
     {
         abort_unless($delivery->driver_id === $request->user()->id, 403);
+
+        if ($error = $this->guardFutureDelivery($delivery)) return $error;
 
         $request->validate([
             'lat'       => 'nullable|numeric',
@@ -63,6 +68,9 @@ class DriverController extends Controller
     public function fail(Delivery $delivery, Request $request): JsonResponse
     {
         abort_unless($delivery->driver_id === $request->user()->id, 403);
+
+        if ($error = $this->guardFutureDelivery($delivery)) return $error;
+
         $request->validate(['reason' => 'required|string']);
         $this->service->failDelivery($delivery, $request->reason);
         return response()->json(['success' => true]);
@@ -75,7 +83,6 @@ class DriverController extends Controller
             'lng' => 'required|numeric',
         ]);
 
-        // Optionally cache or broadcast — kept simple
         Cache::put("driver_loc_{$request->user()->id}", [
             'lat' => $request->lat,
             'lng' => $request->lng,
@@ -83,5 +90,21 @@ class DriverController extends Controller
         ], 600);
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Refuse to act on a delivery whose order's delivery_date is in the future.
+     * Returns null when the date is OK; an error JsonResponse otherwise.
+     */
+    private function guardFutureDelivery(Delivery $delivery): ?JsonResponse
+    {
+        $deliveryDate = $delivery->order?->delivery_date;
+        if ($deliveryDate && $deliveryDate->isFuture()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يمكن تنفيذ هذه التوصيلة قبل موعدها (' . $deliveryDate->format('d/m/Y') . ')',
+            ], 422);
+        }
+        return null;
     }
 }

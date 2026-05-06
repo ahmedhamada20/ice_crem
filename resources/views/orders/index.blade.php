@@ -25,6 +25,7 @@
                     <option value="confirmed">{{ __('Confirmed') }}</option>
                     <option value="delivering">{{ __('Delivering') }}</option>
                     <option value="delivered">{{ __('Delivered') }}</option>
+                    <option value="returned">مرتجع</option>
                     <option value="cancelled">{{ __('Cancelled') }}</option>
                 </select>
             </div>

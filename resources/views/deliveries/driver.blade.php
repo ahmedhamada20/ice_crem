@@ -1,65 +1,91 @@
 @extends('layouts.driver')
 @section('title', 'توصيلاتي')
 
-@php
-    $assigned    = $deliveries->where('status', 'assigned')->count();
-    $inProgress  = $deliveries->where('status', 'in_progress')->count();
-    $totalToday  = $deliveries->where('status', 'delivered')->where('delivered_at', '>=', now()->startOfDay())->count();
-@endphp
-
 @section('content')
-    {{-- Stats --}}
+    {{-- Stats (real numbers from controller) --}}
     <div class="stats-row">
         <div class="stat-card warn">
-            <div class="num">{{ $assigned }}</div>
-            <div class="lbl">معلّقة</div>
+            <div class="num">{{ $stats['assigned'] + $stats['in_progress'] }}</div>
+            <div class="lbl">توصيلات اليوم</div>
         </div>
         <div class="stat-card">
-            <div class="num">{{ $inProgress }}</div>
-            <div class="lbl">جاري التنفيذ</div>
+            <div class="num">{{ $stats['upcoming'] }}</div>
+            <div class="lbl">القادمة</div>
         </div>
         <div class="stat-card success">
-            <div class="num">{{ $totalToday }}</div>
+            <div class="num">{{ $stats['today_done'] }}</div>
             <div class="lbl">تمت اليوم</div>
         </div>
     </div>
 
-    {{-- Refresh button --}}
+    {{-- Today's revenue summary --}}
+    @if($stats['today_done'] > 0)
+    <div class="today-revenue mt-2 mb-1">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <i class="bi bi-cash-coin"></i>
+                <small>إجمالي توصيلات اليوم</small>
+            </div>
+            <strong>{{ number_format($stats['today_revenue'], 2) }} ج.م</strong>
+        </div>
+    </div>
+    @endif
+
+    {{-- ─────────────────────────────────────────────────
+         Section 1: TODAY's deliveries (actionable)
+         ───────────────────────────────────────────────── --}}
     <div class="d-flex justify-content-between align-items-center mt-3 mb-2 px-1">
-        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-list-check"></i> توصيلاتي الحالية</h6>
+        <h6 class="mb-0 fw-bold text-dark">
+            <i class="bi bi-list-check"></i> توصيلات اليوم
+            <span class="badge bg-primary">{{ $todayDeliveries->count() }}</span>
+        </h6>
         <button class="btn btn-sm btn-light" onclick="location.reload()" title="تحديث">
             <i class="bi bi-arrow-clockwise"></i>
         </button>
     </div>
 
-    {{-- Deliveries list --}}
-    @forelse($deliveries as $d)
+    @forelse($todayDeliveries as $d)
+        @php
+            $isOverdue = $d->order->delivery_date && $d->order->delivery_date->lt(now()->startOfDay());
+        @endphp
         <div class="delivery-card {{ str_replace('_', '-', $d->status) }}">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="flex-grow-1">
-                    <div class="order-num">طلب: {{ $d->order->order_number }}</div>
-                    <div class="customer">{{ $d->order->customer->name }}</div>
-                    <div class="meta mb-1">
-                        <i class="bi bi-telephone"></i>
-                        <a href="tel:{{ $d->order->customer->phone }}" class="text-decoration-none text-secondary">
-                            {{ $d->order->customer->phone }}
-                        </a>
-                    </div>
-                    <div class="meta mb-2">
-                        <i class="bi bi-geo-alt"></i> {{ Str::limit($d->order->customer->address ?? '-', 60) }}
-                    </div>
-                </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
                 <span class="pill {{ str_replace('_', '-', $d->status) }}">
                     @switch($d->status)
-                        @case('assigned')    معيّن @break
-                        @case('in_progress') قيد التنفيذ @break
-                        @case('delivered')   تم التسليم @break
+                        @case('assigned')    <i class="bi bi-clock"></i> معيّن @break
+                        @case('in_progress') <i class="bi bi-truck"></i> قيد التنفيذ @break
                         @default {{ $d->status }}
                     @endswitch
                 </span>
+                <small class="text-muted" style="font-size: .72rem;">{{ $d->order->order_number }}</small>
             </div>
 
-            <div class="d-flex justify-content-between align-items-center mt-2 mb-3">
+            @if($isOverdue)
+                <div class="mb-1">
+                    <span class="badge bg-danger">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        متأخر — كان موعدها {{ $d->order->delivery_date->format('d/m/Y') }}
+                    </span>
+                </div>
+            @elseif($d->order->delivery_date)
+                <div class="mb-1">
+                    <small class="text-muted"><i class="bi bi-calendar-check"></i> موعد التسليم: اليوم</small>
+                </div>
+            @endif
+
+            <div class="customer mb-1">{{ $d->order->customer->name }}</div>
+            <div class="meta mb-1">
+                <i class="bi bi-telephone"></i>
+                <a href="tel:{{ $d->order->customer->phone }}" class="text-decoration-none text-secondary">
+                    {{ $d->order->customer->phone }}
+                </a>
+            </div>
+            <div class="meta mb-2">
+                <i class="bi bi-geo-alt"></i> {{ Str::limit($d->order->customer->address ?? '-', 60) }}
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center my-2 pt-2 border-top">
                 <span class="total">{{ number_format((float) $d->order->net_total, 2) }} ج.م</span>
                 @if($d->order->customer->location_lat && $d->order->customer->location_lng)
                 <a href="https://www.google.com/maps/dir/?api=1&destination={{ $d->order->customer->location_lat }},{{ $d->order->customer->location_lng }}"
@@ -70,11 +96,11 @@
             </div>
 
             @if($d->status === 'assigned')
-                <button class="btn-action btn-start" data-id="{{ $d->id }}">
+                <button class="btn-action btn-start mt-2" data-id="{{ $d->id }}">
                     <i class="bi bi-play-fill"></i> ابدأ التوصيل
                 </button>
             @elseif($d->status === 'in_progress')
-                <div class="d-grid gap-2">
+                <div class="d-grid gap-2 mt-2">
                     <button class="btn-action success btn-complete" data-id="{{ $d->id }}">
                         <i class="bi bi-check-circle-fill"></i> اكمل التسليم
                     </button>
@@ -86,11 +112,62 @@
         </div>
     @empty
         <div class="empty">
-            <i class="bi bi-inbox"></i>
-            <h6 class="mt-3">لا توجد توصيلات حالية</h6>
-            <p class="small mb-0">سيتم إعلامك عند تعيين توصيلة جديدة لك</p>
+            <i class="bi bi-check2-circle"></i>
+            <h6 class="mt-3">لا توجد توصيلات لليوم</h6>
+            <p class="small mb-0">يومك خفيف! 🎉</p>
         </div>
     @endforelse
+
+    {{-- ─────────────────────────────────────────────────
+         Section 2: UPCOMING deliveries (read-only)
+         ───────────────────────────────────────────────── --}}
+    @if($upcomingDeliveries->count() > 0)
+        <div class="d-flex justify-content-between align-items-center mt-4 mb-2 px-1">
+            <h6 class="mb-0 fw-bold text-dark">
+                <i class="bi bi-calendar3"></i> التوصيلات القادمة
+                <span class="badge bg-secondary">{{ $upcomingDeliveries->count() }}</span>
+            </h6>
+            <small class="text-muted">للعرض فقط</small>
+        </div>
+
+        @php $currentDate = null; @endphp
+        @foreach($upcomingDeliveries as $d)
+            @php
+                $deliveryDate = $d->order->delivery_date;
+                $dateLabel = $deliveryDate?->format('Y-m-d');
+                $diffDays  = $deliveryDate?->diffInDays(now()->startOfDay());
+            @endphp
+
+            @if($dateLabel !== $currentDate)
+                @php $currentDate = $dateLabel; @endphp
+                <div class="upcoming-date-header">
+                    <i class="bi bi-calendar-event"></i>
+                    {{ $deliveryDate?->translatedFormat('l - d/m/Y') }}
+                    <span class="text-muted small">
+                        ({{ $diffDays === 1 ? 'بكرة' : "بعد {$diffDays} يوم" }})
+                    </span>
+                </div>
+            @endif
+
+            <div class="delivery-card upcoming">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="pill" style="background:#e0e7ff;color:#3730a3;">
+                        <i class="bi bi-lock"></i> قادم
+                    </span>
+                    <small class="text-muted" style="font-size: .72rem;">{{ $d->order->order_number }}</small>
+                </div>
+                <div class="customer mb-1">{{ $d->order->customer->name }}</div>
+                <div class="meta mb-1"><i class="bi bi-telephone"></i> {{ $d->order->customer->phone }}</div>
+                <div class="meta mb-2"><i class="bi bi-geo-alt"></i> {{ Str::limit($d->order->customer->address ?? '-', 60) }}</div>
+                <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                    <span class="total">{{ number_format((float) $d->order->net_total, 2) }} ج.م</span>
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i> الأزرار ستفعل في موعدها
+                    </small>
+                </div>
+            </div>
+        @endforeach
+    @endif
 
     {{-- Complete-delivery modal --}}
     <div class="modal fade" id="completeModal" tabindex="-1">
@@ -123,6 +200,42 @@
     </div>
 @endsection
 
+@push('styles')
+<style>
+.today-revenue {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border-radius: 14px;
+    padding: .75rem 1rem;
+    box-shadow: 0 2px 8px rgba(16,185,129,.25);
+}
+.today-revenue small { opacity: .9; font-size: .8rem; margin-right: .35rem; }
+.today-revenue strong { font-size: 1.1rem; }
+.delivery-card .border-top { border-color: #f3f4f6 !important; }
+
+/* Upcoming date header */
+.upcoming-date-header {
+    background: white;
+    padding: .55rem .9rem;
+    border-radius: 10px;
+    margin: .5rem 0;
+    font-weight: 700;
+    color: #1f2937;
+    border-right: 4px solid #6366f1;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    font-size: .9rem;
+}
+
+/* Upcoming cards: dimmed, no actions */
+.delivery-card.upcoming {
+    background: #fafbfc;
+    opacity: .85;
+    border-right-color: #818cf8 !important;
+}
+.delivery-card.upcoming .customer { color: #4b5563; }
+</style>
+@endpush
+
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
 <script>
@@ -146,10 +259,10 @@ $('.btn-start').on('click', function () {
 function doStart(id, lat, lng, $btn) {
     $.post("{{ url('driver-app/deliveries') }}/" + id + "/start", { _token: "{{ csrf_token() }}", lat, lng })
         .done(() => { toastr.success('تم بدء التوصيل'); setTimeout(() => location.reload(), 600); })
-        .fail(() => { toastr.error('خطأ في بدء التوصيل'); $btn.prop('disabled', false).html('<i class="bi bi-play-fill"></i> ابدأ التوصيل'); });
+        .fail(x => { toastr.error(x.responseJSON?.message || 'خطأ في بدء التوصيل'); $btn.prop('disabled', false).html('<i class="bi bi-play-fill"></i> ابدأ التوصيل'); });
 }
 
-// ── Complete delivery (open modal) ─────────────────
+// ── Complete delivery ──────────────────────────────
 $('.btn-complete').on('click', function () {
     $('#completeId').val($(this).data('id'));
     $('#completeNotes').val('');
@@ -189,7 +302,7 @@ $('#btnSubmitComplete').on('click', function () {
     } else { submit(null, null); }
 });
 
-// ── Fail delivery ─────────────────────────────────
+// ── Fail delivery ──────────────────────────────────
 $('.btn-fail').on('click', function () {
     const id = $(this).data('id');
     Swal.fire({
@@ -210,12 +323,12 @@ $('.btn-fail').on('click', function () {
         if (!r.isConfirmed) return;
         $.post("{{ url('driver-app/deliveries') }}/" + id + "/fail", { _token: "{{ csrf_token() }}", reason: r.value })
             .done(() => { toastr.success('تم تسجيل فشل التسليم'); setTimeout(() => location.reload(), 600); })
-            .fail(() => toastr.error('خطأ'));
+            .fail(x => toastr.error(x.responseJSON?.message || 'خطأ'));
     });
 });
 
-// ── Periodic location ping (optional) ──────────────
-@if($inProgress > 0)
+// ── Periodic location ping (only if active deliveries exist) ──────────────
+@if($stats['in_progress'] > 0)
 if (navigator.geolocation) {
     setInterval(() => {
         navigator.geolocation.getCurrentPosition(pos => {
@@ -225,7 +338,7 @@ if (navigator.geolocation) {
                 lng: pos.coords.longitude
             });
         });
-    }, 60000); // every 60 seconds
+    }, 60000);
 }
 @endif
 </script>

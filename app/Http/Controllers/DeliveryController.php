@@ -73,13 +73,44 @@ class DeliveryController extends Controller
     {
         abort_unless(AuthHelper::isDriver() || AuthHelper::isAdmin(), 403);
 
-        $deliveries = Delivery::with('order.customer')
-            ->forDriver(auth()->id())
-            ->inProgress()
-            ->orderBy('assigned_at')
-            ->get();
+        $driverId = auth()->id();
+        $today    = now()->startOfDay();
 
-        return view('deliveries.driver', compact('deliveries'));
+        // All active deliveries (assigned + in_progress) — split by order's delivery_date
+        $allActive = Delivery::with('order.customer')
+            ->forDriver($driverId)
+            ->inProgress()
+            ->get()
+            ->sortBy(fn ($d) => $d->order->delivery_date?->timestamp ?? 0)
+            ->values();
+
+        // "Today + overdue" → actionable
+        $todayDeliveries = $allActive->filter(function ($d) use ($today) {
+            $date = $d->order->delivery_date;
+            return ! $date || $date->lte($today);
+        })->values();
+
+        // Future-dated → read-only preview
+        $upcomingDeliveries = $allActive->filter(function ($d) use ($today) {
+            $date = $d->order->delivery_date;
+            return $date && $date->gt($today);
+        })->values();
+
+        // Stats (real numbers from DB so delivered deliveries get counted)
+        $todayDeliveredOrderIds = Delivery::forDriver($driverId)
+            ->where('status', 'delivered')
+            ->where('delivered_at', '>=', $today)
+            ->pluck('order_id');
+
+        $stats = [
+            'assigned'      => $todayDeliveries->where('status', 'assigned')->count(),
+            'in_progress'   => $todayDeliveries->where('status', 'in_progress')->count(),
+            'upcoming'      => $upcomingDeliveries->count(),
+            'today_done'    => $todayDeliveredOrderIds->count(),
+            'today_revenue' => (float) Order::whereIn('id', $todayDeliveredOrderIds)->sum('net_total'),
+        ];
+
+        return view('deliveries.driver', compact('todayDeliveries', 'upcomingDeliveries', 'stats'));
     }
 
     public function driverHistory(Request $request)

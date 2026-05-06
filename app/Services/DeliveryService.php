@@ -4,9 +4,12 @@ namespace App\Services;
 
 use App\Models\Delivery;
 use App\Models\Order;
+use Illuminate\Support\Facades\DB;
 
 class DeliveryService
 {
+    public function __construct(private OrderService $orderService) {}
+
     public function assignDriver(Order $order, int $driverId, ?string $vehicle = null): Delivery
     {
         $order->update(['status' => 'delivering']);
@@ -34,21 +37,32 @@ class DeliveryService
         return $delivery;
     }
 
+    /**
+     * Driver completes a delivery.
+     * Wraps the operation in a transaction so the delivery + the related
+     * order's stock deduction happen together.
+     */
     public function completeDelivery(Delivery $delivery, array $data): Delivery
     {
-        $delivery->update([
-            'status'        => 'delivered',
-            'delivered_at'  => now(),
-            'end_lat'       => $data['lat'] ?? null,
-            'end_lng'       => $data['lng'] ?? null,
-            'signature'     => $data['signature'] ?? null,
-            'photo'         => $data['photo'] ?? null,
-            'notes'         => $data['notes'] ?? null,
-        ]);
+        return DB::transaction(function () use ($delivery, $data) {
+            $delivery->update([
+                'status'        => 'delivered',
+                'delivered_at'  => now(),
+                'end_lat'       => $data['lat'] ?? null,
+                'end_lng'       => $data['lng'] ?? null,
+                'signature'     => $data['signature'] ?? null,
+                'photo'         => $data['photo'] ?? null,
+                'notes'         => $data['notes'] ?? null,
+            ]);
 
-        $delivery->order->update(['status' => 'delivered']);
+            // Mark the order delivered + deduct stock (idempotent)
+            if ($delivery->order) {
+                $delivery->order->loadMissing('items');
+                $this->orderService->markDelivered($delivery->order);
+            }
 
-        return $delivery;
+            return $delivery->fresh();
+        });
     }
 
     public function failDelivery(Delivery $delivery, string $reason): Delivery

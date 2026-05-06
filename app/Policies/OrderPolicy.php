@@ -62,6 +62,19 @@ class OrderPolicy
     public function cancel(User $user, Order $order): bool
     {
         return $user->can('orders.cancel')
-            && in_array($order->status, ['pending', 'confirmed']);
+            && in_array($order->status, ['pending', 'confirmed', 'delivering']);
+    }
+
+    public function returnOrder(User $user, Order $order): bool
+    {
+        // Only admins can mark a delivered order as returned
+        return $user->hasAnyRole(['super-admin', 'admin'])
+            && $order->status === 'delivered';
+    }
+
+    public function markDelivered(User $user, Order $order): bool
+    {
+        return $user->hasAnyRole(['super-admin', 'admin', 'driver'])
+            && in_array($order->status, ['confirmed', 'delivering']);
     }
 }

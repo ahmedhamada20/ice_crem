@@ -125,7 +125,21 @@ class Order extends Model
             'delivering' => '<span class="badge bg-primary">'.__('Delivering').'</span>',
             'delivered'  => '<span class="badge bg-success">'.__('Delivered').'</span>',
             'cancelled'  => '<span class="badge bg-danger">'.__('Cancelled').'</span>',
+            'returned'   => '<span class="badge bg-dark">مرتجع</span>',
             default      => '<span class="badge bg-secondary">-</span>',
+        };
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->status) {
+            'pending'    => __('Pending'),
+            'confirmed'  => __('Confirmed'),
+            'delivering' => __('Delivering'),
+            'delivered'  => __('Delivered'),
+            'cancelled'  => __('Cancelled'),
+            'returned'   => 'مرتجع',
+            default      => $this->status,
         };
     }
 }

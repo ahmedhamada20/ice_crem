@@ -126,6 +126,28 @@ class OrderController extends Controller
         }
     }
 
+    public function markDelivered(Order $order): JsonResponse
+    {
+        $this->authorize('markDelivered', $order);
+        try {
+            $this->service->markDelivered($order);
+            return response()->json(['success' => true, 'message' => 'تم تسليم الطلب وخصم الكمية من المخزون']);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function returnOrder(Order $order, Request $request): JsonResponse
+    {
+        $this->authorize('returnOrder', $order);
+        try {
+            $this->service->returnOrder($order, $request->input('reason'));
+            return response()->json(['success' => true, 'message' => 'تم تسجيل الإرجاع وإعادة الكمية للمخزون']);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
     public function searchProducts(Request $request): JsonResponse
     {
         $q = $request->get('q', '');

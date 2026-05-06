@@ -6,21 +6,43 @@
 <div class="row g-3">
     <div class="col-md-8">
         <div class="card shadow-sm">
-            <div class="card-header d-flex justify-content-between">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h6 class="mb-0">{{ $order->order_number }} {!! $order->status_badge !!}</h6>
-                <div>
+                <div class="d-flex flex-wrap gap-1">
                     @can('confirm', $order)
-                    <button class="btn btn-sm btn-success" id="btnConfirm"><i class="bi bi-check-circle"></i> تأكيد</button>
+                        <button class="btn btn-sm btn-success" id="btnConfirm">
+                            <i class="bi bi-check-circle"></i> تأكيد
+                        </button>
                     @endcan
+
+                    @can('markDelivered', $order)
+                        <button class="btn btn-sm btn-primary" id="btnDeliver">
+                            <i class="bi bi-truck"></i> تسليم يدوي
+                        </button>
+                    @endcan
+
+                    @can('returnOrder', $order)
+                        <button class="btn btn-sm btn-dark" id="btnReturn">
+                            <i class="bi bi-arrow-counterclockwise"></i> إرجاع
+                        </button>
+                    @endcan
+
                     @can('cancel', $order)
-                    <button class="btn btn-sm btn-danger" id="btnCancel"><i class="bi bi-x-circle"></i> إلغاء</button>
+                        <button class="btn btn-sm btn-danger" id="btnCancel">
+                            <i class="bi bi-x-circle"></i> إلغاء
+                        </button>
                     @endcan
-                    <a class="btn btn-sm btn-secondary" href="{{ route('orders.print', $order) }}" target="_blank"><i class="bi bi-printer"></i></a>
+
+                    <a class="btn btn-sm btn-secondary" href="{{ route('orders.print', $order) }}" target="_blank">
+                        <i class="bi bi-printer"></i>
+                    </a>
                 </div>
             </div>
             <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-4"><strong>{{ __('Customer') }}:</strong> {{ $order->customer->name }}</div>
+                <div class="row mb-3 g-2">
+                    <div class="col-md-4"><strong>{{ __('Customer') }}:</strong>
+                        <a href="{{ route('customers.show', $order->customer) }}">{{ $order->customer->name }}</a>
+                    </div>
                     <div class="col-md-4"><strong>{{ __('Salesman') }}:</strong> {{ $order->salesman?->name ?? '-' }}</div>
                     <div class="col-md-4"><strong>{{ __('Order Date') }}:</strong> {{ $order->order_date->format('d/m/Y') }}</div>
                 </div>
@@ -43,7 +65,28 @@
                 </table>
 
                 @if($order->notes)
-                <div class="alert alert-light mt-3"><strong>{{ __('Notes') }}:</strong> {{ $order->notes }}</div>
+                    <div class="alert alert-light mt-3"><strong>{{ __('Notes') }}:</strong> {{ $order->notes }}</div>
+                @endif
+
+                {{-- Status info hint --}}
+                @if($order->status === 'pending')
+                    <div class="alert alert-warning small mb-0">
+                        <i class="bi bi-info-circle"></i> الطلب معلَّق — التأكيد لن يخصم من المخزون،
+                        الخصم يحدث عند التسليم الفعلي للعميل.
+                    </div>
+                @elseif($order->status === 'confirmed')
+                    <div class="alert alert-info small mb-0">
+                        <i class="bi bi-info-circle"></i> الطلب مؤكَّد. الكمية لم تُخصم بعد —
+                        ستُخصم تلقائياً عند تسليم السائق للعميل.
+                    </div>
+                @elseif($order->status === 'delivered')
+                    <div class="alert alert-success small mb-0">
+                        <i class="bi bi-check-circle"></i> تم تسليم الطلب وخصم الكمية من المخزون.
+                    </div>
+                @elseif($order->status === 'returned')
+                    <div class="alert alert-dark small mb-0">
+                        <i class="bi bi-arrow-counterclockwise"></i> الطلب مرتجع — تمت إعادة الكمية للمخزون.
+                    </div>
                 @endif
             </div>
         </div>
@@ -64,36 +107,108 @@
         <div class="card shadow-sm mt-3">
             <div class="card-header"><h6 class="mb-0">المراحل</h6></div>
             <ul class="list-group list-group-flush">
-                <li class="list-group-item"><i class="bi bi-clock"></i> أُنشئ: {{ $order->created_at->format('d/m/Y H:i') }}</li>
+                <li class="list-group-item">
+                    <i class="bi bi-clock text-muted"></i> أُنشئ: {{ $order->created_at->format('d/m/Y H:i') }}
+                </li>
                 @if($order->confirmed_at)
-                <li class="list-group-item"><i class="bi bi-check-circle text-success"></i> تأكد: {{ $order->confirmed_at->format('d/m/Y H:i') }}</li>
+                    <li class="list-group-item">
+                        <i class="bi bi-check-circle text-info"></i> تأكَّد: {{ $order->confirmed_at->format('d/m/Y H:i') }}
+                    </li>
                 @endif
                 @if($order->delivery)
-                <li class="list-group-item"><i class="bi bi-truck"></i> التوصيل: {{ $order->delivery->status }}</li>
+                    <li class="list-group-item">
+                        <i class="bi bi-truck text-primary"></i>
+                        التوصيل: {{ $order->delivery->driver?->name ?? '-' }}
+                        ({{ $order->delivery->status }})
+                    </li>
+                @endif
+                @if($order->status === 'delivered' && $order->delivery?->delivered_at)
+                    <li class="list-group-item">
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        تم التسليم: {{ $order->delivery->delivered_at->format('d/m/Y H:i') }}
+                    </li>
+                @endif
+                @if($order->status === 'returned')
+                    <li class="list-group-item text-dark">
+                        <i class="bi bi-arrow-counterclockwise"></i> مرتجع
+                    </li>
                 @endif
                 @if($order->cancelled_at)
-                <li class="list-group-item text-danger"><i class="bi bi-x-circle"></i> إلغاء: {{ $order->cancelled_at->format('d/m/Y H:i') }}</li>
+                    <li class="list-group-item text-danger">
+                        <i class="bi bi-x-circle"></i> إلغاء: {{ $order->cancelled_at->format('d/m/Y H:i') }}
+                    </li>
                 @endif
             </ul>
         </div>
+
+        @if($order->invoice)
+        <div class="card shadow-sm mt-3">
+            <div class="card-header"><h6 class="mb-0">الفاتورة</h6></div>
+            <div class="card-body">
+                <p class="mb-1">
+                    <strong>رقم:</strong>
+                    <a href="{{ route('invoices.show', $order->invoice) }}">{{ $order->invoice->invoice_number }}</a>
+                </p>
+                <p class="mb-0"><strong>الحالة:</strong> {!! $order->invoice->status_badge !!}</p>
+            </div>
+        </div>
+        @endif
     </div>
 </div>
 @endsection
 
 @push('scripts')
 <script>
-$('#btnConfirm').on('click', function () {
-    Swal.fire({ title: 'تأكيد الطلب؟', text: 'سيتم خصم الكمية من المخزون.', icon: 'question', showCancelButton: true })
-        .then(r => r.isConfirmed && $.post("{{ route('orders.confirm', $order) }}", { _token: "{{ csrf_token() }}" })
-            .done(d => { toastr.success(d.message); setTimeout(() => location.reload(), 800); })
-            .fail(x => toastr.error(x.responseJSON?.message || 'خطأ')));
+function postAction(url, message) {
+    return $.post(url, { _token: "{{ csrf_token() }}" })
+        .done(d => { toastr.success(d.message || message); setTimeout(() => location.reload(), 800); })
+        .fail(x => toastr.error(x.responseJSON?.message || 'حدث خطأ'));
+}
+
+function postActionWithReason(url, title, message) {
+    return Swal.fire({
+        title, input: 'text', inputPlaceholder: 'السبب (اختياري)',
+        showCancelButton: true, confirmButtonText: 'تأكيد', cancelButtonText: 'إلغاء'
+    }).then(r => {
+        if (! r.isConfirmed) return;
+        return $.post(url, { _token: "{{ csrf_token() }}", reason: r.value })
+            .done(d => { toastr.success(d.message || message); setTimeout(() => location.reload(), 800); })
+            .fail(x => toastr.error(x.responseJSON?.message || 'حدث خطأ'));
+    });
+}
+
+$('#btnConfirm').on('click', () => {
+    Swal.fire({
+        title: 'تأكيد الطلب؟',
+        text: 'سيتم إنشاء الفاتورة. الخصم من المخزون يحدث عند التسليم الفعلي.',
+        icon: 'question', showCancelButton: true,
+        confirmButtonText: 'تأكيد', cancelButtonText: 'إلغاء'
+    }).then(r => r.isConfirmed && postAction("{{ route('orders.confirm', $order) }}", 'تم التأكيد'));
 });
 
-$('#btnCancel').on('click', function () {
-    Swal.fire({ title: 'سبب الإلغاء؟', input: 'text', showCancelButton: true })
-        .then(r => r.isConfirmed && $.post("{{ route('orders.cancel', $order) }}", { _token: "{{ csrf_token() }}", reason: r.value })
-            .done(d => { toastr.success(d.message); setTimeout(() => location.reload(), 800); })
-            .fail(x => toastr.error(x.responseJSON?.message || 'خطأ')));
+$('#btnDeliver').on('click', () => {
+    Swal.fire({
+        title: 'تسليم الطلب يدوياً؟',
+        text: 'سيتم خصم الكمية من المخزون فوراً. (عادةً يحدث هذا تلقائياً عند تسليم السائق.)',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonText: 'تسليم وخصم', cancelButtonText: 'إلغاء'
+    }).then(r => r.isConfirmed && postAction("{{ route('orders.deliver', $order) }}", 'تم التسليم'));
+});
+
+$('#btnReturn').on('click', () => {
+    postActionWithReason(
+        "{{ route('orders.return', $order) }}",
+        'تأكيد إرجاع الطلب؟',
+        'تم تسجيل الإرجاع وإعادة الكمية للمخزون'
+    );
+});
+
+$('#btnCancel').on('click', () => {
+    postActionWithReason(
+        "{{ route('orders.cancel', $order) }}",
+        'سبب الإلغاء؟',
+        'تم إلغاء الطلب'
+    );
 });
 </script>
 @endpush

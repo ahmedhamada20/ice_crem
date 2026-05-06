@@ -37,6 +37,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('orders/data', [OrderController::class, 'getData'])->name('orders.data');
     Route::post('orders/{order}/confirm', [OrderController::class, 'confirm'])->name('orders.confirm');
     Route::post('orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
+    Route::post('orders/{order}/deliver', [OrderController::class, 'markDelivered'])->name('orders.deliver');
+    Route::post('orders/{order}/return', [OrderController::class, 'returnOrder'])->name('orders.return');
     Route::get('orders/{order}/print', [OrderController::class, 'print'])->name('orders.print');
     Route::get('orders/products/search', [OrderController::class, 'searchProducts'])->name('orders.products.search');
     Route::get('orders/customers/search', [OrderController::class, 'searchCustomers'])->name('orders.customers.search');
