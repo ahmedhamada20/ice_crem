@@ -88,27 +88,32 @@ class DeliveryController extends Controller
 
         $period = $request->input('period', 'week');  // today | week | month | all
 
+        // Qualify column names with table prefix so they survive a future JOIN
         $base = Delivery::with('order.customer')
             ->forDriver(auth()->id())
-            ->whereIn('status', ['delivered', 'failed', 'returned']);
+            ->whereIn('deliveries.status', ['delivered', 'failed', 'returned']);
 
         $now = now();
         match ($period) {
-            'today' => $base->whereDate('updated_at', $now->toDateString()),
-            'week'  => $base->where('updated_at', '>=', $now->copy()->startOfWeek()),
-            'month' => $base->where('updated_at', '>=', $now->copy()->startOfMonth()),
+            'today' => $base->whereDate('deliveries.updated_at', $now->toDateString()),
+            'week'  => $base->where('deliveries.updated_at', '>=', $now->copy()->startOfWeek()),
+            'month' => $base->where('deliveries.updated_at', '>=', $now->copy()->startOfMonth()),
             default => null,  // 'all' — no filter
         };
 
-        $deliveries = (clone $base)->orderByDesc('updated_at')->limit(100)->get();
+        $deliveries = (clone $base)->orderByDesc('deliveries.updated_at')->limit(100)->get();
 
         // Stats (over chosen period)
         $statsQuery   = clone $base;
-        $deliveredCnt = (clone $statsQuery)->where('status', 'delivered')->count();
-        $failedCnt    = (clone $statsQuery)->where('status', 'failed')->count();
-        $totalRevenue = (float) (clone $statsQuery)->where('status', 'delivered')
-            ->join('orders', 'orders.id', '=', 'deliveries.order_id')
-            ->sum('orders.net_total');
+        $deliveredCnt = (clone $statsQuery)->where('deliveries.status', 'delivered')->count();
+        $failedCnt    = (clone $statsQuery)->where('deliveries.status', 'failed')->count();
+
+        // Sum revenue from related orders (loaded by id to avoid join ambiguity)
+        $deliveredOrderIds = (clone $statsQuery)
+            ->where('deliveries.status', 'delivered')
+            ->pluck('deliveries.order_id');
+
+        $totalRevenue = (float) Order::whereIn('id', $deliveredOrderIds)->sum('net_total');
 
         $stats = [
             'period'    => $period,
@@ -140,7 +145,15 @@ class DeliveryController extends Controller
 
     public function show(Delivery $delivery)
     {
-        $delivery->load('order.customer', 'driver');
-        return view('deliveries.show', compact('delivery'));
+        $isDriverOnly = AuthHelper::isDriver() && ! AuthHelper::isAdmin();
+
+        // Drivers may only view deliveries assigned to them
+        if ($isDriverOnly && $delivery->driver_id !== auth()->id()) {
+            abort(403, 'ليس لديك صلاحية الوصول إلى هذه التوصيلة');
+        }
+
+        $delivery->load('order.customer', 'order.items.product', 'driver');
+
+        return view('deliveries.show', compact('delivery', 'isDriverOnly'));
     }
 }
