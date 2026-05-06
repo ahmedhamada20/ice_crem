@@ -1,6 +1,9 @@
-<aside class="sidebar" style="width: 250px;">
-    <div class="brand text-center">
-        <i class="bi bi-shop"></i> {{ __('Ice Cream Distribution') }}
+<aside class="sidebar">
+    <div class="brand d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-shop"></i> {{ __('Ice Cream Distribution') }}</span>
+        <button class="btn btn-sm btn-link text-light p-0 d-lg-none" data-toggle-sidebar aria-label="إغلاق">
+            <i class="bi bi-x-lg"></i>
+        </button>
     </div>
     <nav class="p-2">
         <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">
