@@ -10,14 +10,42 @@ use Yajra\DataTables\Facades\DataTables;
 
 class ZoneController extends Controller
 {
-    public function index() { return view('zones.index'); }
+    public function index()
+    {
+        $stats = [
+            'total'           => Zone::count(),
+            'active'          => Zone::where('is_active', true)->count(),
+            'total_customers' => \App\Models\Customer::whereNotNull('zone_id')->count(),
+            'total_users'     => \App\Models\User::whereNotNull('zone_id')->count(),
+        ];
+        return view('zones.index', compact('stats'));
+    }
 
     public function getData(): JsonResponse
     {
-        return DataTables::eloquent(Zone::query()->with('manager:id,name')->select('zones.*'))
-            ->addColumn('manager_name', fn ($z) => $z->manager?->name ?? '-')
-            ->addColumn('actions', fn ($z) => "<button data-id='{$z->id}' class='btn btn-sm btn-warning btn-edit'><i class='bi bi-pencil'></i></button>")
-            ->rawColumns(['actions'])
+        $query = Zone::query()
+            ->with('manager:id,name')
+            ->withCount(['customers', 'users']);
+
+        return DataTables::eloquent($query)
+            ->editColumn('code', fn ($z) => '<span class="fw-bold">'.e($z->code).'</span>')
+            ->editColumn('name', fn ($z) => '<div class="fw-semibold"><i class="bi bi-geo-alt text-primary"></i> '.e($z->name).'</div>')
+            ->addColumn('manager_name', function ($z) {
+                if (! $z->manager) return '<span class="text-muted">— غير معيّن —</span>';
+                return '<i class="bi bi-person-circle"></i> '.e($z->manager->name);
+            })
+            ->addColumn('status_badge', fn ($z) => $z->is_active
+                ? '<span class="badge bg-success">'.__('Active').'</span>'
+                : '<span class="badge bg-secondary">'.__('Inactive').'</span>')
+            ->addColumn('actions', function ($z) {
+                $show = route('zones.show', $z);
+                return '<div class="btn-group btn-group-sm">'
+                    .'<a href="'.$show.'" class="btn btn-outline-primary" title="عرض"><i class="bi bi-eye"></i></a>'
+                    .'<button data-id="'.$z->id.'" class="btn btn-outline-warning btn-edit" title="تعديل"><i class="bi bi-pencil"></i></button>'
+                    .'<button data-id="'.$z->id.'" class="btn btn-outline-danger btn-delete" title="حذف"><i class="bi bi-trash"></i></button>'
+                    .'</div>';
+            })
+            ->rawColumns(['code', 'name', 'manager_name', 'status_badge', 'actions'])
             ->make(true);
     }
 

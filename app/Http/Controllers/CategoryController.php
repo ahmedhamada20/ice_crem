@@ -10,7 +10,16 @@ use Yajra\DataTables\Facades\DataTables;
 
 class CategoryController extends Controller
 {
-    public function index() { return view('categories.index'); }
+    public function index()
+    {
+        $stats = [
+            'total'          => Category::count(),
+            'active'         => Category::where('is_active', true)->count(),
+            'with_products'  => Category::has('products')->count(),
+            'total_products' => \App\Models\Product::count(),
+        ];
+        return view('categories.index', compact('stats'));
+    }
 
     public function getData(): JsonResponse
     {

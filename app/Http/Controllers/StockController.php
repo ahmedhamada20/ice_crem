@@ -16,9 +16,20 @@ class StockController extends Controller
 
     public function index()
     {
+        $stats = [
+            'total_items'  => Stock::count(),
+            'total_units'  => (int) Stock::sum('quantity'),
+            'low_stock'    => Stock::lowStock()->count(),
+            'out_of_stock' => Stock::where('quantity', 0)->count(),
+            'stock_value'  => (float) \DB::table('stock')
+                ->join('products', 'products.id', '=', 'stock.product_id')
+                ->select(\DB::raw('SUM(stock.quantity * products.cost) as v'))->value('v'),
+            'movements_today' => \App\Models\StockMovement::whereDate('created_at', today())->count(),
+        ];
+
         $warehouses = Warehouse::active()->get(['id', 'name']);
         $products   = Product::active()->get(['id', 'code', 'name']);
-        return view('stock.index', compact('warehouses', 'products'));
+        return view('stock.index', compact('warehouses', 'products', 'stats'));
     }
 
     public function getData(Request $request): JsonResponse
@@ -30,17 +41,21 @@ class StockController extends Controller
         if ($request->filled('warehouse_id')) $query->where('warehouse_id', $request->warehouse_id);
 
         return DataTables::eloquent($query)
-            ->addColumn('product_code', fn ($s) => $s->product?->code)
-            ->addColumn('product_name', fn ($s) => $s->product?->name)
+            ->addColumn('product_code', fn ($s) => '<span class="fw-bold">'.e($s->product?->code).'</span>')
+            ->addColumn('product_name', fn ($s) => '<div class="fw-semibold">'.e($s->product?->name).'</div>')
             ->addColumn('warehouse_name', fn ($s) => $s->warehouse?->name)
-            ->addColumn('available', fn ($s) => $s->available)
+            ->editColumn('quantity', fn ($s) => '<span class="fw-bold">'.$s->quantity.'</span>')
+            ->addColumn('available', function ($s) {
+                $cls = $s->available <= 0 ? 'text-danger' : 'text-success';
+                return '<span class="fw-bold '.$cls.'">'.$s->available.'</span>';
+            })
             ->addColumn('status', function ($s) {
                 $min = $s->product?->min_stock ?? 0;
-                if ($s->quantity <= 0) return '<span class="badge bg-danger">نافد</span>';
-                if ($min > 0 && $s->quantity <= $min) return '<span class="badge bg-warning text-dark">منخفض</span>';
-                return '<span class="badge bg-success">متاح</span>';
+                if ($s->quantity <= 0) return '<span class="badge bg-danger"><i class="bi bi-x-circle"></i> نافد</span>';
+                if ($min > 0 && $s->quantity <= $min) return '<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> منخفض</span>';
+                return '<span class="badge bg-success"><i class="bi bi-check-circle"></i> متاح</span>';
             })
-            ->rawColumns(['status'])
+            ->rawColumns(['product_code', 'product_name', 'quantity', 'available', 'status'])
             ->make(true);
     }
 

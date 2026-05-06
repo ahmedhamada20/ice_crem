@@ -132,6 +132,111 @@
 
         /* ── Badges ────────────────────────────────────────────── */
         .badge-status { padding: 0.4em 0.65em; }
+
+        /* ════════════════════════════════════════════════════════
+           Shared design system (KPI cards, pills, filters, tables)
+           ════════════════════════════════════════════════════════ */
+
+        /* KPI cards */
+        .kpi-stat {
+            background: white;
+            border-radius: 14px;
+            padding: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,.04);
+            transition: transform .15s, box-shadow .15s;
+            height: 100%;
+        }
+        .kpi-stat:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,0,0,.08); }
+        .kpi-stat .kpi-icon {
+            width: 56px; height: 56px;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.6rem; flex-shrink: 0;
+        }
+        .kpi-stat .kpi-info small { color: #6b7280; font-size: .8rem; display: block; }
+        .kpi-stat .kpi-info h3 { margin: 0; font-weight: 800; color: #111827; font-size: 1.5rem; }
+        .kpi-primary .kpi-icon { background: #dbeafe; color: #1d4ed8; }
+        .kpi-success .kpi-icon { background: #d1fae5; color: #059669; }
+        .kpi-warning .kpi-icon { background: #fef3c7; color: #b45309; }
+        .kpi-danger  .kpi-icon { background: #fee2e2; color: #b91c1c; }
+        .kpi-info    .kpi-icon { background: #ede9fe; color: #6d28d9; }
+        .kpi-dark    .kpi-icon { background: #e5e7eb; color: #1f2937; }
+
+        @media (max-width: 768px) {
+            .kpi-stat { padding: .85rem; gap: .65rem; }
+            .kpi-stat .kpi-icon { width: 44px; height: 44px; font-size: 1.25rem; border-radius: 11px; }
+            .kpi-stat .kpi-info h3 { font-size: 1.15rem; }
+            .kpi-stat .kpi-info small { font-size: .72rem; }
+        }
+
+        /* Status / type filter pills */
+        .filter-pills .filter-pill {
+            background: white;
+            border: 1.5px solid #e5e7eb;
+            color: #6b7280;
+            padding: .45rem 1rem;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: .85rem;
+            transition: all .15s;
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            cursor: pointer;
+        }
+        .filter-pills .filter-pill:hover { color: #1f2937; border-color: #cbd5e1; }
+        .filter-pills .filter-pill.active {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white; border-color: transparent;
+            box-shadow: 0 4px 10px rgba(99,102,241,.3);
+        }
+        .filter-pill.active.pill-warning { background: linear-gradient(135deg, #f59e0b, #d97706) !important; box-shadow: 0 4px 10px rgba(245,158,11,.3) !important; }
+        .filter-pill.active.pill-info    { background: linear-gradient(135deg, #06b6d4, #0891b2) !important; box-shadow: 0 4px 10px rgba(6,182,212,.3) !important; }
+        .filter-pill.active.pill-primary { background: linear-gradient(135deg, #3b82f6, #2563eb) !important; box-shadow: 0 4px 10px rgba(59,130,246,.3) !important; }
+        .filter-pill.active.pill-success { background: linear-gradient(135deg, #10b981, #059669) !important; box-shadow: 0 4px 10px rgba(16,185,129,.3) !important; }
+        .filter-pill.active.pill-danger  { background: linear-gradient(135deg, #ef4444, #dc2626) !important; box-shadow: 0 4px 10px rgba(239,68,68,.3) !important; }
+        .filter-pill.active.pill-dark    { background: linear-gradient(135deg, #4b5563, #1f2937) !important; box-shadow: 0 4px 10px rgba(75,85,99,.3) !important; }
+
+        .count-badge {
+            background: rgba(0,0,0,0.08);
+            padding: .1rem .45rem;
+            border-radius: 999px;
+            font-size: .7rem;
+            font-weight: 700;
+        }
+        .filter-pill.active .count-badge { background: rgba(255,255,255,.25); color: white; }
+
+        /* Filters bar */
+        .filters-bar {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid #f3f4f6;
+        }
+
+        /* Pretty tables */
+        .pretty-table thead th {
+            background: #f9fafb;
+            color: #4b5563;
+            font-weight: 700;
+            font-size: .85rem;
+            border-bottom: 2px solid #e5e7eb;
+            padding: .85rem .65rem;
+        }
+        .pretty-table tbody td {
+            padding: .85rem .65rem;
+            vertical-align: middle;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .pretty-table tbody tr:hover { background: #fafbff; }
+        .pretty-table .badge { font-size: .72rem; padding: .35em .65em; }
+
+        @media (max-width: 576px) {
+            .filter-pills .filter-pill { font-size: .75rem; padding: .35rem .7rem; }
+        }
     </style>
 
     @stack('styles')
@@ -183,6 +288,7 @@
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.colVis.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -233,16 +339,7 @@
         window.addEventListener('resize', () => { if (window.innerWidth >= 992) close(); });
     })();
 
-    // ── Default DataTables responsive defaults ────────────────
-    if (typeof $.fn.dataTable !== 'undefined') {
-        $.extend(true, $.fn.dataTable.defaults, {
-            responsive: true,
-            autoWidth: false,
-            language: window.dtArabic
-        });
-    }
-
-    // DataTables Arabic translation defaults
+    // DataTables Arabic translation (must be defined BEFORE defaults extend)
     window.dtArabic = {
         "sEmptyTable":     "ليست هناك بيانات متاحة في الجدول",
         "sLoadingRecords": "جارٍ التحميل...",
@@ -261,6 +358,14 @@
             "sLast":     "الأخير"
         }
     };
+
+    // ── Default DataTables options (after dtArabic is defined) ────
+    if (typeof $.fn.dataTable !== 'undefined') {
+        $.extend(true, $.fn.dataTable.defaults, {
+            autoWidth: false,
+            language: window.dtArabic
+        });
+    }
 </script>
 
 @stack('scripts')

@@ -17,31 +17,90 @@ class DeliveryController extends Controller
 
     public function index()
     {
-        return view('deliveries.index');
+        $today = now()->startOfDay();
+
+        $base = Delivery::query();
+        if (AuthHelper::isDriver() && ! AuthHelper::isAdmin()) {
+            $base->where('driver_id', auth()->id());
+        }
+
+        $stats = [
+            'total'       => (clone $base)->count(),
+            'assigned'    => (clone $base)->where('status', 'assigned')->count(),
+            'in_progress' => (clone $base)->where('status', 'in_progress')->count(),
+            'delivered'   => (clone $base)->where('status', 'delivered')
+                                ->where('delivered_at', '>=', $today)->count(),
+            'failed'      => (clone $base)->where('status', 'failed')
+                                ->where('updated_at', '>=', $today)->count(),
+            'returned'    => (clone $base)->where('status', 'returned')->count(),
+            'pending_orders' => Order::where('status', 'confirmed')->whereDoesntHave('delivery')->count(),
+            'active_drivers' => User::role('driver')->where('status', 'active')->count(),
+        ];
+
+        $drivers = User::role('driver')->where('status', 'active')->orderBy('name')->get(['id', 'name']);
+
+        return view('deliveries.index', compact('stats', 'drivers'));
     }
 
     public function getData(Request $request): JsonResponse
     {
         $query = Delivery::query()
-            ->with(['order.customer:id,name', 'driver:id,name'])
+            ->with(['order.customer:id,name,phone', 'driver:id,name'])
             ->select('deliveries.*');
 
-        if (AuthHelper::isDriver()) {
+        if (AuthHelper::isDriver() && ! AuthHelper::isAdmin()) {
             $query->where('driver_id', auth()->id());
         }
 
-        if ($request->filled('status')) $query->where('status', $request->status);
+        if ($request->filled('status'))    $query->where('deliveries.status', $request->status);
+        if ($request->filled('driver_id')) $query->where('driver_id', $request->driver_id);
+        if ($request->filled('from'))      $query->whereDate('assigned_at', '>=', $request->from);
+        if ($request->filled('to'))        $query->whereDate('assigned_at', '<=', $request->to);
 
         return DataTables::eloquent($query)
-            ->addColumn('order_number', fn($d) => $d->order?->order_number)
-            ->addColumn('customer_name', fn($d) => $d->order?->customer?->name)
-            ->addColumn('driver_name', fn($d) => $d->driver?->name ?? '-')
-            ->editColumn('assigned_at', fn($d) => $d->assigned_at?->format('d/m/Y H:i'))
+            ->editColumn('delivery_number', function ($d) {
+                $url = route('deliveries.show', $d);
+                return '<a href="'.$url.'" class="fw-bold text-decoration-none">'.e($d->delivery_number).'</a>';
+            })
+            ->addColumn('order_number', function ($d) {
+                if (! $d->order) return '-';
+                $url = route('orders.show', $d->order);
+                return '<a href="'.$url.'" class="text-decoration-none">'.e($d->order->order_number).'</a>';
+            })
+            ->addColumn('customer_name', function ($d) {
+                $name  = e($d->order?->customer?->name ?? '-');
+                $phone = e($d->order?->customer?->phone ?? '');
+                $html  = '<div class="fw-semibold">'.$name.'</div>';
+                if ($phone) {
+                    $html .= '<small class="text-muted"><i class="bi bi-telephone"></i> '.$phone.'</small>';
+                }
+                return $html;
+            })
+            ->addColumn('driver_name', function ($d) {
+                if (! $d->driver) return '<span class="text-muted">— غير معيّن —</span>';
+                return '<i class="bi bi-person-circle text-primary"></i> '.e($d->driver->name);
+            })
+            ->editColumn('assigned_at', function ($d) {
+                if (! $d->assigned_at) return '-';
+                return '<div>'.$d->assigned_at->format('d/m/Y').'</div>'
+                    . '<small class="text-muted">'.$d->assigned_at->format('H:i').'</small>';
+            })
+            ->addColumn('status_badge', function ($d) {
+                $map = [
+                    'assigned'    => ['معيّن',         'warning text-dark', 'clock'],
+                    'in_progress' => ['قيد التنفيذ',   'primary',           'truck'],
+                    'delivered'   => ['تم التسليم',    'success',           'check-circle'],
+                    'failed'      => ['فشل',           'danger',            'x-circle'],
+                    'returned'    => ['مرتجع',         'dark',              'arrow-counterclockwise'],
+                ];
+                [$label, $cls, $icon] = $map[$d->status] ?? [$d->status, 'secondary', 'circle'];
+                return '<span class="badge bg-'.$cls.'"><i class="bi bi-'.$icon.'"></i> '.$label.'</span>';
+            })
             ->addColumn('actions', function ($d) {
                 $show = route('deliveries.show', $d);
-                return "<a href='$show' class='btn btn-sm btn-info'><i class='bi bi-eye'></i></a>";
+                return '<a href="'.$show.'" class="btn btn-sm btn-outline-primary" title="عرض"><i class="bi bi-eye"></i></a>';
             })
-            ->rawColumns(['actions'])
+            ->rawColumns(['delivery_number', 'order_number', 'customer_name', 'driver_name', 'assigned_at', 'status_badge', 'actions'])
             ->make(true);
     }
 

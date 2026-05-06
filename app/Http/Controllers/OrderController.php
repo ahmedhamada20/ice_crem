@@ -25,8 +25,34 @@ class OrderController extends Controller
     public function index()
     {
         $this->authorize('viewAny', Order::class);
+
+        $today      = now()->startOfDay();
+        $monthStart = now()->startOfMonth();
+        $confirmed  = ['confirmed', 'delivering', 'delivered'];
+
+        // Scope stats to current user when relevant (salesmen see only theirs)
+        $base = Order::query();
+        if (AuthHelper::isSalesman()) {
+            $base->where('salesman_id', auth()->id());
+        }
+
+        $stats = [
+            'today_count'     => (clone $base)->whereDate('order_date', $today)->count(),
+            'today_revenue'   => (float) (clone $base)
+                ->whereDate('order_date', $today)
+                ->whereIn('status', $confirmed)->sum('net_total'),
+            'pending'         => (clone $base)->where('status', 'pending')->count(),
+            'delivered_month' => (clone $base)->where('status', 'delivered')
+                ->whereDate('order_date', '>=', $monthStart)->count(),
+            'returned'        => (clone $base)->where('status', 'returned')->count(),
+            'total_month'     => (float) (clone $base)
+                ->whereDate('order_date', '>=', $monthStart)
+                ->whereIn('status', $confirmed)->sum('net_total'),
+        ];
+
         $salesmen = User::role('salesman')->get(['id', 'name']);
-        return view('orders.index', compact('salesmen'));
+
+        return view('orders.index', compact('salesmen', 'stats'));
     }
 
     public function getData(Request $request): JsonResponse
@@ -47,20 +73,40 @@ class OrderController extends Controller
         if ($request->filled('to'))          $query->whereDate('order_date', '<=', $request->to);
 
         return DataTables::eloquent($query)
-            ->addColumn('customer_name', fn($o) => $o->customer?->name ?? '-')
-            ->addColumn('salesman_name', fn($o) => $o->salesman?->name ?? '-')
-            ->editColumn('order_date', fn($o) => $o->order_date?->format('d/m/Y'))
-            ->editColumn('net_total', fn($o) => number_format((float) $o->net_total, 2))
-            ->addColumn('status_badge', fn($o) => $o->status_badge)
+            ->editColumn('order_number', function ($o) {
+                $url = route('orders.show', $o);
+                return '<a href="'.$url.'" class="fw-bold text-decoration-none">'.e($o->order_number).'</a>';
+            })
+            ->addColumn('customer_name', function ($o) {
+                $name  = e($o->customer?->name ?? '-');
+                $phone = e($o->customer?->phone ?? '');
+                $html  = '<div class="fw-semibold">'.$name.'</div>';
+                if ($phone) {
+                    $html .= '<small class="text-muted"><i class="bi bi-telephone"></i> '.$phone.'</small>';
+                }
+                return $html;
+            })
+            ->addColumn('salesman_name', fn ($o) => $o->salesman?->name ?? '-')
+            ->editColumn('order_date', function ($o) {
+                if (! $o->order_date) return '-';
+                $date = $o->order_date->format('d/m/Y');
+                $rel  = $o->order_date->isToday() ? 'اليوم'
+                      : ($o->order_date->isYesterday() ? 'أمس' : $o->order_date->diffForHumans());
+                return '<div>'.$date.'</div><small class="text-muted">'.e($rel).'</small>';
+            })
+            ->editColumn('net_total', function ($o) {
+                return '<span class="fw-bold text-success">'.number_format((float) $o->net_total, 2).'</span>';
+            })
+            ->addColumn('status_badge', fn ($o) => $o->status_badge)
             ->addColumn('actions', function ($o) {
                 $show  = route('orders.show', $o);
                 $print = route('orders.print', $o);
-                return <<<HTML
-                    <a href="{$show}" class="btn btn-sm btn-info"><i class="bi bi-eye"></i></a>
-                    <a href="{$print}" class="btn btn-sm btn-secondary" target="_blank"><i class="bi bi-printer"></i></a>
-                HTML;
+                return '<div class="btn-group btn-group-sm">'
+                    .'<a href="'.$show.'" class="btn btn-outline-primary" title="عرض"><i class="bi bi-eye"></i></a>'
+                    .'<a href="'.$print.'" class="btn btn-outline-secondary" target="_blank" title="طباعة"><i class="bi bi-printer"></i></a>'
+                    .'</div>';
             })
-            ->rawColumns(['status_badge', 'actions'])
+            ->rawColumns(['order_number', 'customer_name', 'order_date', 'net_total', 'status_badge', 'actions'])
             ->make(true);
     }
 

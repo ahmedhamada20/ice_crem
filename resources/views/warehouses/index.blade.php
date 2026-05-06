@@ -3,25 +3,52 @@
 @section('page_title', __('Warehouses'))
 
 @section('content')
-<div class="card shadow-sm">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-building"></i> {{ __('Warehouses') }}</h5>
-        <button class="btn btn-primary btn-sm" id="btnAdd"><i class="bi bi-plus-lg"></i> {{ __('Add New') }}</button>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="kpi-stat kpi-primary">
+            <div class="kpi-icon"><i class="bi bi-building"></i></div>
+            <div class="kpi-info"><small>إجمالي المستودعات</small><h3>{{ $stats['total'] }}</h3></div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-stat kpi-success">
+            <div class="kpi-icon"><i class="bi bi-check-circle"></i></div>
+            <div class="kpi-info"><small>نشطة</small><h3>{{ $stats['active'] }}</h3></div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-stat kpi-warning">
+            <div class="kpi-icon"><i class="bi bi-star-fill"></i></div>
+            <div class="kpi-info"><small>مستودع رئيسي</small><h3>{{ $stats['main'] }}</h3></div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-stat kpi-info">
+            <div class="kpi-icon"><i class="bi bi-stack"></i></div>
+            <div class="kpi-info"><small>إجمالي المخزون</small><h3>{{ number_format($stats['total_qty']) }}</h3></div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2 py-3">
+        <div>
+            <h5 class="mb-0 fw-bold"><i class="bi bi-building text-primary"></i> {{ __('Warehouses') }}</h5>
+            <small class="text-muted">إدارة المستودعات والمواقع</small>
+        </div>
+        <button class="btn btn-primary" id="btnAdd"><i class="bi bi-plus-lg"></i> مستودع جديد</button>
     </div>
     <div class="card-body">
-        <table id="dt" class="table table-striped table-bordered w-100">
-            <thead class="table-dark">
-                <tr>
-                    <th>{{ __('Code') }}</th>
-                    <th>{{ __('Name') }}</th>
-                    <th>{{ __('Address') }}</th>
-                    <th>{{ __('Phone') }}</th>
-                    <th>رئيسي</th>
-                    <th>{{ __('Status') }}</th>
-                    <th>{{ __('Actions') }}</th>
-                </tr>
-            </thead>
-        </table>
+        <div class="table-responsive">
+            <table id="dt" class="table pretty-table table-hover w-100 align-middle">
+                <thead><tr>
+                    <th>{{ __('Code') }}</th><th>{{ __('Name') }}</th><th>{{ __('Address') }}</th>
+                    <th>{{ __('Phone') }}</th><th>المدير</th><th class="text-end">عدد الأصناف</th>
+                    <th>{{ __('Status') }}</th><th class="text-center">{{ __('Actions') }}</th>
+                </tr></thead>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -37,21 +64,13 @@
                     <div class="col-md-8"><label>{{ __('Name') }} *</label><input type="text" name="name" id="name" class="form-control" required></div>
                     <div class="col-12"><label>{{ __('Address') }}</label><input type="text" name="address" id="address" class="form-control"></div>
                     <div class="col-md-6"><label>{{ __('Phone') }}</label><input type="text" name="phone" id="phone" class="form-control"></div>
-                    <div class="col-md-6">
-                        <label>المدير</label>
-                        <select name="manager_id" id="manager_id" class="form-select">
-                            <option value="">--</option>
+                    <div class="col-md-6"><label>المدير</label>
+                        <select name="manager_id" id="manager_id" class="form-select"><option value="">--</option>
                             @foreach(\App\Models\User::active()->get() as $u)<option value="{{ $u->id }}">{{ $u->name }}</option>@endforeach
                         </select>
                     </div>
-                    <div class="col-md-6 form-check ms-3">
-                        <input type="checkbox" name="is_main" id="is_main" class="form-check-input" value="1">
-                        <label class="form-check-label" for="is_main">مستودع رئيسي</label>
-                    </div>
-                    <div class="col-md-6 form-check">
-                        <input type="checkbox" name="is_active" id="is_active" class="form-check-input" value="1" checked>
-                        <label class="form-check-label" for="is_active">{{ __('Active') }}</label>
-                    </div>
+                    <div class="col-md-6 form-check ms-3"><input type="checkbox" name="is_main" id="is_main" class="form-check-input" value="1"><label class="form-check-label" for="is_main">رئيسي</label></div>
+                    <div class="col-md-6 form-check"><input type="checkbox" name="is_active" id="is_active" class="form-check-input" value="1" checked><label class="form-check-label" for="is_active">{{ __('Active') }}</label></div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -70,15 +89,16 @@ $(function () {
         processing: true, serverSide: true, responsive: true,
         ajax: "{{ route('warehouses.data') }}",
         columns: [
-            { data: 'code' }, { data: 'name' }, { data: 'address' }, { data: 'phone' },
-            { data: 'is_main', render: v => v ? '<span class="badge bg-warning text-dark">رئيسي</span>' : '—' },
-            { data: 'is_active', render: v => v ? '<span class="badge bg-success">{{ __("Active") }}</span>' : '<span class="badge bg-secondary">{{ __("Inactive") }}</span>' },
-            { data: 'actions', orderable: false, searchable: false }
-        ],
-        language: window.dtArabic
+            { data: 'code', name: 'code' }, { data: 'name', name: 'name' },
+            { data: 'address', name: 'address' }, { data: 'phone', name: 'phone' },
+            { data: 'manager_name', name: 'manager.name' },
+            { data: 'products_count', name: 'products_count', className: 'text-end' },
+            { data: 'status_badge', name: 'is_active', orderable: false },
+            { data: 'actions', orderable: false, searchable: false, className: 'text-center' }
+        ]
     });
 
-    $('#btnAdd').on('click', () => { $('#form')[0].reset(); $('#id').val(''); $('#is_active').prop('checked', true); $('#formModal').modal('show'); });
+    $('#btnAdd').on('click', () => { $('#form')[0].reset(); $('#id').val(''); $('#is_active').prop('checked', true); $('#is_main').prop('checked', false); $('#formModal').modal('show'); });
 
     $('#dt').on('click', '.btn-edit', function () {
         $.get("{{ url('warehouses') }}/" + $(this).data('id') + "/edit", d => {

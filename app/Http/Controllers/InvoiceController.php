@@ -19,7 +19,25 @@ class InvoiceController extends Controller
     public function index()
     {
         $this->authorize('viewAny', Invoice::class);
-        return view('invoices.index');
+
+        $base = Invoice::query();
+        if (AuthHelper::isZoneManager() && AuthHelper::currentUserZone()) {
+            $base->whereHas('customer', fn ($q) => $q->where('zone_id', AuthHelper::currentUserZone()));
+        }
+
+        $stats = [
+            'total'        => (clone $base)->count(),
+            'unpaid'       => (clone $base)->where('status', 'unpaid')->count(),
+            'partial'      => (clone $base)->where('status', 'partial')->count(),
+            'paid'         => (clone $base)->where('status', 'paid')->count(),
+            'overdue'      => (clone $base)->where('status', 'overdue')->count(),
+            'cancelled'    => (clone $base)->where('status', 'cancelled')->count(),
+            'outstanding'  => (float) (clone $base)->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum('balance'),
+            'overdue_amt'  => (float) (clone $base)->where('status', 'overdue')->sum('balance'),
+            'total_month'  => (float) (clone $base)->whereDate('issue_date', '>=', now()->startOfMonth())->sum('total'),
+        ];
+
+        return view('invoices.index', compact('stats'));
     }
 
     public function getData(Request $request): JsonResponse
@@ -38,20 +56,35 @@ class InvoiceController extends Controller
         if ($request->filled('to'))     $query->whereDate('issue_date', '<=', $request->to);
 
         return DataTables::eloquent($query)
-            ->addColumn('customer_name', fn ($i) => $i->customer?->name)
-            ->editColumn('issue_date', fn ($i) => $i->issue_date?->format('d/m/Y'))
-            ->editColumn('due_date', fn ($i) => $i->due_date?->format('d/m/Y'))
+            ->editColumn('invoice_number', function ($i) {
+                $url = route('invoices.show', $i);
+                return '<a href="'.$url.'" class="fw-bold text-decoration-none">'.e($i->invoice_number).'</a>';
+            })
+            ->addColumn('customer_name', fn ($i) => '<div class="fw-semibold">'.e($i->customer?->name ?? '-').'</div>')
+            ->editColumn('issue_date', fn ($i) => $i->issue_date?->format('d/m/Y') ?? '-')
+            ->editColumn('due_date', function ($i) {
+                if (! $i->due_date) return '-';
+                $isOverdue = $i->due_date->isPast() && in_array($i->status, ['unpaid','partial']);
+                $cls = $isOverdue ? 'text-danger fw-bold' : '';
+                return '<span class="'.$cls.'">'.$i->due_date->format('d/m/Y').'</span>';
+            })
             ->editColumn('total', fn ($i) => number_format((float) $i->total, 2))
-            ->editColumn('paid', fn ($i) => number_format((float) $i->paid, 2))
-            ->editColumn('balance', fn ($i) => number_format((float) $i->balance, 2))
+            ->editColumn('paid', fn ($i) => '<span class="text-success">'.number_format((float) $i->paid, 2).'</span>')
+            ->editColumn('balance', function ($i) {
+                $val = (float) $i->balance;
+                $cls = $val > 0 ? 'text-danger fw-bold' : 'text-muted';
+                return '<span class="'.$cls.'">'.number_format($val, 2).'</span>';
+            })
             ->addColumn('status_badge', fn ($i) => $i->status_badge)
             ->addColumn('actions', function ($i) {
                 $show = route('invoices.show', $i);
                 $print = route('invoices.print', $i);
-                return "<a href='$show' class='btn btn-sm btn-info'><i class='bi bi-eye'></i></a>
-                        <a href='$print' target='_blank' class='btn btn-sm btn-secondary'><i class='bi bi-printer'></i></a>";
+                return '<div class="btn-group btn-group-sm">'
+                    .'<a href="'.$show.'" class="btn btn-outline-primary" title="عرض"><i class="bi bi-eye"></i></a>'
+                    .'<a href="'.$print.'" class="btn btn-outline-secondary" target="_blank" title="طباعة"><i class="bi bi-printer"></i></a>'
+                    .'</div>';
             })
-            ->rawColumns(['status_badge', 'actions'])
+            ->rawColumns(['invoice_number', 'customer_name', 'due_date', 'paid', 'balance', 'status_badge', 'actions'])
             ->make(true);
     }
 

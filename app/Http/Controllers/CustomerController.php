@@ -21,8 +21,28 @@ class CustomerController extends Controller
     public function index()
     {
         $this->authorize('viewAny', Customer::class);
+
+        // Apply zone restriction for non-admin viewers
+        $base = Customer::query();
+        if (! AuthHelper::canAccessAllZones() && AuthHelper::currentUserZone()) {
+            $base->where('zone_id', AuthHelper::currentUserZone());
+        }
+
+        $stats = [
+            'total'         => (clone $base)->count(),
+            'active'        => (clone $base)->where('status', 'active')->count(),
+            'inactive'      => (clone $base)->where('status', 'inactive')->count(),
+            'blocked'       => (clone $base)->where('status', 'blocked')->count(),
+            'shops'         => (clone $base)->where('type', 'shop')->count(),
+            'supermarkets'  => (clone $base)->where('type', 'supermarket')->count(),
+            'cafes'         => (clone $base)->where('type', 'cafe')->count(),
+            'with_balance'  => (clone $base)->where('balance', '>', 0)->count(),
+            'total_balance' => (float) (clone $base)->where('balance', '>', 0)->sum('balance'),
+        ];
+
         $zones = Zone::active()->orderBy('name')->get(['id', 'name']);
-        return view('customers.index', compact('zones'));
+
+        return view('customers.index', compact('zones', 'stats'));
     }
 
     public function getData(Request $request): JsonResponse
@@ -49,22 +69,51 @@ class CustomerController extends Controller
         }
 
         return DataTables::eloquent($query)
-            ->addColumn('zone_name', fn($c) => $c->zone?->name ?? '-')
-            ->editColumn('type', fn($c) => __($c->type))
-            ->editColumn('balance', fn($c) => number_format((float) $c->balance, 2))
-            ->editColumn('credit_limit', fn($c) => number_format((float) $c->credit_limit, 2))
-            ->addColumn('status_badge', fn($c) => $c->status_badge)
+            ->editColumn('code', function ($c) {
+                $url = route('customers.show', $c);
+                return '<a href="'.$url.'" class="fw-bold text-decoration-none">'.e($c->code).'</a>';
+            })
+            ->editColumn('name', function ($c) {
+                $typeIcon = match ($c->type) {
+                    'shop'        => 'bi-shop',
+                    'supermarket' => 'bi-basket',
+                    'cafe'        => 'bi-cup-hot',
+                    default       => 'bi-building',
+                };
+                $contact = $c->phone ? '<small class="text-muted"><i class="bi bi-telephone"></i> '.e($c->phone).'</small>' : '';
+                return '<div class="d-flex align-items-center gap-2">'
+                    .'<i class="bi '.$typeIcon.' fs-5 text-primary"></i>'
+                    .'<div><div class="fw-semibold">'.e($c->name).'</div>'.$contact.'</div>'
+                    .'</div>';
+            })
+            ->addColumn('zone_name', fn ($c) => $c->zone?->name ?? '-')
+            ->editColumn('type', function ($c) {
+                $cls = match ($c->type) {
+                    'shop'        => 'bg-primary',
+                    'supermarket' => 'bg-success',
+                    'cafe'        => 'bg-info text-dark',
+                    default       => 'bg-secondary',
+                };
+                return '<span class="badge '.$cls.'">'.__($c->type).'</span>';
+            })
+            ->editColumn('balance', function ($c) {
+                $val = (float) $c->balance;
+                $cls = $val > 0 ? 'text-danger' : ($val < 0 ? 'text-success' : 'text-muted');
+                return '<span class="fw-bold '.$cls.'">'.number_format($val, 2).'</span>';
+            })
+            ->editColumn('credit_limit', fn ($c) => number_format((float) $c->credit_limit, 2))
+            ->addColumn('status_badge', fn ($c) => $c->status_badge)
             ->addColumn('actions', function ($c) {
                 $show = route('customers.show', $c);
-                $edit = "data-id=\"{$c->id}\" class=\"btn btn-sm btn-warning btn-edit\"";
-                $del  = "data-id=\"{$c->id}\" class=\"btn btn-sm btn-danger btn-delete\"";
-                return <<<HTML
-                    <a href="{$show}" class="btn btn-sm btn-info"><i class="bi bi-eye"></i></a>
-                    <button {$edit}><i class="bi bi-pencil"></i></button>
-                    <button {$del}><i class="bi bi-trash"></i></button>
-                HTML;
+                $statement = route('customers.statement', $c);
+                return '<div class="btn-group btn-group-sm">'
+                    .'<a href="'.$show.'" class="btn btn-outline-primary" title="عرض"><i class="bi bi-eye"></i></a>'
+                    .'<a href="'.$statement.'" class="btn btn-outline-info" title="كشف حساب"><i class="bi bi-file-text"></i></a>'
+                    .'<button data-id="'.$c->id.'" class="btn btn-outline-warning btn-edit" title="تعديل"><i class="bi bi-pencil"></i></button>'
+                    .'<button data-id="'.$c->id.'" class="btn btn-outline-danger btn-delete" title="حذف"><i class="bi bi-trash"></i></button>'
+                    .'</div>';
             })
-            ->rawColumns(['status_badge', 'actions'])
+            ->rawColumns(['code', 'name', 'type', 'balance', 'status_badge', 'actions'])
             ->make(true);
     }
 
