@@ -19,11 +19,22 @@
         </a>
         @endhasanyrole
 
-        @hasanyrole('super-admin|admin|driver')
-        <a href="{{ route('deliveries.index') }}" class="{{ request()->routeIs('deliveries.*') ? 'active' : '' }}">
+        @hasanyrole('super-admin|admin')
+        <a href="{{ route('deliveries.index') }}"
+           class="{{ request()->routeIs('deliveries.index') || request()->routeIs('deliveries.show') || request()->routeIs('deliveries.dispatch') ? 'active' : '' }}">
             <i class="bi bi-truck"></i> {{ __('Deliveries') }}
         </a>
+        <a href="{{ route('deliveries.driver') }}" target="_blank" rel="noopener">
+            <i class="bi bi-phone"></i> تطبيق السائق
+            <i class="bi bi-box-arrow-up-right small"></i>
+        </a>
         @endhasanyrole
+
+        @role('driver')
+        <a href="{{ route('deliveries.driver') }}" class="{{ request()->routeIs('deliveries.driver') ? 'active' : '' }}">
+            <i class="bi bi-truck"></i> توصيلاتي
+        </a>
+        @endrole
 
         @hasanyrole('super-admin|admin|accountant')
         <a href="{{ route('invoices.index') }}" class="{{ request()->routeIs('invoices.*') ? 'active' : '' }}">

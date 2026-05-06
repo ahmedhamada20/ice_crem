@@ -84,12 +84,19 @@ class DeliveryController extends Controller
 
     public function map()
     {
-        $drivers = User::role('driver')
-            ->where('status', 'active')
-            ->with(['deliveries' => fn ($q) => $q->inProgress()->with('order.customer')])
-            ->get();
+        $isDriverOnly = AuthHelper::isDriver() && ! AuthHelper::isAdmin();
 
-        return view('deliveries.map', compact('drivers'));
+        $driversQuery = User::role('driver')
+            ->where('status', 'active')
+            ->with(['deliveries' => fn ($q) => $q->inProgress()->with('order.customer')]);
+
+        if ($isDriverOnly) {
+            $driversQuery->where('id', auth()->id());
+        }
+
+        $drivers = $driversQuery->get();
+
+        return view('deliveries.map', compact('drivers', 'isDriverOnly'));
     }
 
     public function show(Delivery $delivery)
